@@ -112,20 +112,23 @@ impl JwsContext {
             };
             capacity += util::ceiling(signer.signature_len() * 4, 3);
 
+            let mut message_buffer = vec![];
             let mut message = String::with_capacity(capacity);
             util::encode_base64_urlsafe_nopad_buf(header_bytes, &mut message);
             message.push_str(".");
+            message_buffer.append(unsafe {message.clone().as_mut_vec()});
             if b64 {
                 util::encode_base64_urlsafe_nopad_buf(payload, &mut message);
             } else {
-                let payload = std::str::from_utf8(payload)?;
-                if payload.contains(".") {
-                    bail!("A JWS payload cannot contain dot.");
-                }
-                message.push_str(payload);
+                //let payload = std::str::from_utf8_unchecked(payload);
+                //if payload.contains(".") {
+                //    bail!("A JWS payload cannot contain dot.");
+                //}
+                //message.push_str(payload);
+                message_buffer.append(payload.to_vec().as_mut());
             }
 
-            let signature = signer.sign(message.as_bytes())?;
+            let signature = signer.sign(&message_buffer)?;
 
             message.push_str(".");
             util::encode_base64_urlsafe_nopad_buf(signature, &mut message);
@@ -212,7 +215,7 @@ impl JwsContext {
                 }
 
                 if i > 0 {
-                    result.push_str(",");
+                    result.push(',');
                 }
 
                 let protected_bytes = serde_json::to_vec(&protected_map)?;
@@ -225,7 +228,7 @@ impl JwsContext {
 
                 result.push_str("{\"protected\":\"");
                 result.push_str(&protected_b64);
-                result.push_str("\"");
+                result.push('"');
 
                 if unprotected_map.len() > 0 {
                     let unprotected = serde_json::to_string(&unprotected_map)?;
